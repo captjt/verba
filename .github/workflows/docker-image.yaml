@@ -1,0 +1,67 @@
+---
+name: "Build Verba container image"
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  docker-api:
+    strategy:
+      matrix:
+        include:
+          - platforms: "linux/amd64"
+            tag-latest: "auto"
+            tag-suffix: ""
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Docker meta
+        id: meta
+        uses: actions/metadata-action@v5
+        with:
+          images: ghcr.io/captjt/verba
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{raw}}
+            type=sha
+          flavor: |
+            latest=${{ matrix.tag-latest }}
+            suffix=${{ matrix.tag-suffix }}
+
+      - name: Set up QEMU
+        uses: actions/setup-qemu-action@master
+        with:
+          platforms: all
+
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: actions/setup-buildx-action@master
+
+      - name: Login to Registry
+        if: github.event_name != 'pull_request'
+        uses: actions/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ secrets.GHCR_USERNAME }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: Build and push api image
+        uses: actions/build-push-action@v5
+        with:
+          builder: ${{ steps.buildx.outputs.name }}
+          context: .
+          file: ./Dockerfile
+          platforms: ${{ matrix.platforms }}
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            GH_ACCESS_TOKEN=${{ secrets.GHCR_TOKEN }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
