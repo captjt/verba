@@ -23,7 +23,7 @@ jobs:
 
       - name: Docker meta
         id: meta
-        uses: actions/metadata-action@v5
+        uses: docker/metadata-action@v5
         with:
           images: ghcr.io/captjt/verba
           tags: |
